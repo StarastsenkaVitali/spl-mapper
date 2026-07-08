@@ -1,241 +1,100 @@
 <!DOCTYPE html>
 <html lang="en">
 <!-- IBA Bulgaria 2024 Vitali Starastsenka -->
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Document</title>
-  <style>
-    * {
-      margin: 5px;
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      font-size: 18px;
-    }
-
-    .instruction {
-      padding: 10px;
-
-    }
-
-    .wrapper {
-      display: flex;
-      flex-direction: column;
-
-    }
-
-    button {
-      display: block;
-      width: fit-content;
-      word-wrap: initial;
-      text-decoration: none;
-      font-size: 1em;
-      background-color: #3cd6ba;
-      color: #ffffff;
-      padding: 10px;
-      margin-bottom: 5px;
-      border: solid 2px #0000;
-      border-radius: 5px;
-      cursor: pointer;
-      line-height: 22px;
-    }
-
-    button:hover {
-      color: #3cd6ba;
-      background-color: #ffffff;
-      border: solid 2px #3cd6ba;
-    }
-
-    input {
-      width: auto;
-      display: flex;
-      border: 3px solid #8be5ca;
-      box-sizing: border-box;
-      height: 2em;
-      padding: 0 0 0 5px;
-      outline: none;
-      text-align: center;
-      font-size: 1em;
-    }
-
-    .block {
-      display: flex;
-      padding: 10px;
-      background-color: #d9d9d9;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .red {
-      color: #fc5f5f;
-    }
-
-    .green {
-      color: rgb(46, 176, 23);
-    }
-  </style>
-  <style>
-    #funkyText {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-wrap: wrap;
-      cursor: pointer;
-    }
-
-
-   @keyframes spinL {
-      0% {
-        transform: rotate(0deg);
-      }
-
-      100% {
-        transform: rotate(360deg);
-      }
-    }
-
-    @keyframes spinR {
-      0% {
-        transform: rotate(0deg);
-      }
-
-      100% {
-        transform: rotate(-360deg);
-      }
-    }
-
-    @keyframes pulsate {
-      0% {
-        transform: scale(1);
-      }
-
-      50% {
-        transform: scale(1.5);
-      }
-
-      100% {
-        transform: scale(1);
-      }
-    }
-
-    @keyframes rotX {
-      0% {
-        transform: rotateX(0deg);
-      }
-
-      100% {
-        transform: rotateX(360deg);
-      }
-    }
-
-    @keyframes rotY {
-      0% {
-        transform: rotateY(0deg);
-      }
-
-      100% {
-        transform: rotateY(360deg);
-      }
-    }
-
-    @keyframes rotZ {
-      0% {
-        transform: rotateZ(0deg);
-      }
-
-      100% {
-        transform: rotateZ(360deg);
-      }
-    } 
-
-    @keyframes rotXYZ {
-      0% {
-        -webkit-transform: rotate(0deg) rotateX(0deg) rotateY(0deg);
-        transform: rotate(0deg) rotateX(0deg) rotateY(0deg)
-      }
-
-      50% {
-        -webkit-transform: rotate(180deg) rotateX(90deg) rotateY(0deg);
-        transform: rotate(180deg) rotateX(90deg) rotateY(0deg)
-      }
-
-      100% {
-        -webkit-transform: rotate(360deg) rotateX(0deg) rotateY(0deg);
-        transform: rotate(360deg) rotateX(0deg) rotateY(0deg)
-      }
-    }
-  </style>
-
+  <title>SPL Mapper</title>
+  <link rel="stylesheet" href="./styles.css">
 </head>
 
 <body>
+  <div class="app">
+    <header>
+      <div id="funkyText"></div>
+      <p class="subtitle">Map assembler listings to runtime traces &mdash; s390 &amp; x86</p>
+    </header>
 
-  <div class="wrapper">
-    <div class="block">
-      <!-- add listing type selector -->
-      <label for="listing_type">Select architecture type:</label>
-      <select class="listing_type">
-          <option value=""></option>
-        <option value="s390">s390</option>
-        <option value="x86">x86</option>
-      </select>
-      <p class="listing_type_status">
-  
-      </p>
+    <div class="steps">
+      <!-- Step 1: architecture -->
+      <section class="step" data-step="1">
+        <div class="step-num"><span>1</span></div>
+        <div class="step-body">
+          <h2>Select architecture type</h2>
+          <div class="controls">
+            <select class="listing_type">
+              <option value="">Choose architecture…</option>
+              <option value="s390">s390</option>
+              <option value="x86">x86</option>
+            </select>
+            <span class="listing_type_status"></span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Step 2: listing -->
+      <section class="step locked" data-step="2">
+        <div class="step-num"><span>2</span></div>
+        <div class="step-body">
+          <h2>Open the assembler listing</h2>
+          <div class="controls">
+            <button class="open_listing">📂 Open Listing</button>
+          </div>
+          <p class="status listing_status"></p>
+        </div>
+      </section>
+
+      <!-- Step 3: trace -->
+      <section class="step locked" data-step="3">
+        <div class="step-num"><span>3</span></div>
+        <div class="step-body">
+          <h2>Confirm module name &amp; open the trace</h2>
+          <div class="controls">
+            <input type="text" class="module" value="CMDDTOR@" placeholder="Module name">
+            <button class="open_trace" disabled>📈 Open Trace</button>
+          </div>
+          <p class="status trace_status"></p>
+        </div>
+      </section>
+
+      <!-- Step 4: save -->
+      <section class="step locked" data-step="4">
+        <div class="step-num"><span>4</span></div>
+        <div class="step-body">
+          <h2>Save the results</h2>
+          <div class="controls">
+            <button class="save" disabled>💾 Save Map</button>
+            <button class="save_stmts ghost" disabled>📄 Save Source Trace</button>
+          </div>
+          <p class="status save_status"></p>
+          <p class="status save_src_status"></p>
+        </div>
+      </section>
     </div>
-    <div class="block">
-      <button class="open_listing">
-        Open Listing
-      </button>
-      <p class="listing_status">
 
-      </p>
-    </div>
-    <div class="block">
-      <input type="text" class="module" value="CMDDTOR@" placeholder="module name">
-      <button class="open_trace">
-        Open Trace
-      </button>
-      <p class="trace_status">
-
-      </p>
-    </div>
-    <div class="block">
-      <button class="save">
-        Save Map
-      </button>
-      <p class="save_status">
-
-      </p>
-    </div>
-    <div class="block">
-      <button class="save_stmts">
-        Save Source Trace
-      </button>
-      <p class="save_src_status">
-
-      </p>
+    <div class="instruction">
+      <h3>How it works</h3>
+      <ol>
+        <li>Pick the architecture (s390 or x86).</li>
+        <li>Click <strong>Open Listing</strong> to load addresses and statements.</li>
+        <li>Check the module name, then click <strong>Open Trace</strong> to build the mapping.</li>
+        <li><strong>Save Map</strong> stores the full mapping; <strong>Save Source Trace</strong> stores only the source lines.</li>
+      </ol>
+      <p class="note">Works in Google Chrome and Microsoft Edge.</p>
     </div>
   </div>
-  <div class="instruction">
-    Instructions:
-    <ol>
-      <li>Select a listing file by click on 'Open Listing' button to upload addresses and statements</li>
-      <li>Ckeck module name in text input before loading trace file</li>
-      <li>If you want to save the mapping with assembler instructions - click on 'Save Map' button</li>
-      <li>If you want to save only lines of source code - click on 'Save Source Trace'</li>
-    </ol>
-    This application works in Google Chrome and EDGE browsers
-  </div>
-  <div id="funkyText"></div>
+
+  <div id="toast-container"></div>
+
   <script src="./script.js"></script>
   <script>
     var funkyText = document.getElementById("funkyText");
-    //var funkyText=document.getElementsByClassName("funkyText")[0];
     var fonts = ["times", "serif", "courier new", "monospace", "florence", "cursive", "blippo", "fantasy", "Amatic SC", "Press Start 2P", "Architects Daughter", "Bad Script", "Cookie", "Courgette", "Covered By Your Grace", "Dancing", "Script", "Gloria Hallelujah", "Great Vibes", "Handlee", "Indie Flower", "Kaushan Script", "Pacifico", "Patrick Hand", "Annie Use Your Telescope", "Bangers", "Boogaloo", "Aldrich", "Brawler", "Butterfly Kids", "Snowburst One", "Swanky and Moo Moo", "Caesar Dressing", "Ubuntu", "Nosifer", "Sarina", "Shojumaru", "Spirax", "Rock Salt", "Reenie Beanie", "Atomic Age", "Condiment", "Eater", "Meddon", "Metal Mania", "Monofett", "Caveat", "Coming Soon", "Permanent Marker", "Sacramento", "Satisfy", "Shadows Into Light", "Shadows Into Light Two", "Tangerine", "Yellowtail", "Cormorant Upright", "Sancreek", "Allan", "Lobster", "Inconsolata", "Limelight", "Aclonica", "Comic Sans MS", "Brown", "Oswald", "Roboto", "Space Mono", "Creepster", "Delius Swash Caps", "Qwigley", "Oleo Script", "Stalemate", "Chewy", "Playball", "Yesteryear", "Titillium Web"];
-
 
     var effects = ["spinL", "spinR", "pulsate", "rotX", "rotY", "rotZ", "rotXYZ"];
     var easings = ["linear", "ease-in", "ease-out", "ease-in-out"];
+
     function randFont() {
       return fonts[Math.floor(Math.random() * fonts.length)];
     }
@@ -268,24 +127,19 @@
 
       for (var i = 0; i < letters.length; i++) {
         const letter = document.createElement("div");
-        letter.innerHTML = letters[i];
-
+        letter.innerHTML = letters[i] === " " ? "&nbsp;" : letters[i];
         letter.onclick = function () {
           letter.stylize()
         }
-
         letter.stylize();
-
-
         funkyText.appendChild(letter);
       }
     }
-    window.onload = ()=>{
+
+    window.onload = () => {
       funky('SPL Mapper')
     }
   </script>
-
-
 </body>
 
 </html>

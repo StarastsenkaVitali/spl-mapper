@@ -33,12 +33,13 @@ const saveFile = async (blob, type) => {
     });
 
     const writable = await handle.createWritable();
-    writable.filename = writable.filename + '.full.txt'
     await writable.write(blob);
     await writable.close();
     return handle;
   } catch (err) {
-    console.error(err.message);
+    // User cancelling the save dialog is a benign no-op.
+    if (err.name === 'AbortError') return undefined;
+    throw err;
   }
 };
 let data = '';
@@ -84,7 +85,7 @@ function getStatments390(text) {
 }
 
 function extractStatmentsAddresses(listingLines) {
-  result = []
+  const result = []
   for (let i = 1; i < listingLines.length; i++) {
     const line = listingLines[i];
     const match = line.match(/S_(\d+)/);
@@ -130,7 +131,7 @@ function getStatments86(text) {
 }
 
 function getCommands(text, moduleName) {
-  const traceLines = text.split('\r\n')
+  const traceLines = text.split(/\r?\n/)
   const traceCommands = [];
   let cmdCounter = 0
   const addrPointer = 2 + moduleName.length
@@ -154,47 +155,92 @@ const openTraceStatus = document.querySelector('.trace_status');
 const saveStatus = document.querySelector('.save_status');
 const saveSrcStatus = document.querySelector('.save_src_status');
 const modNameInput = document.querySelector('.module')
+const openTraceBtn = document.querySelector('.open_trace');
+const saveBtn = document.querySelector('.save');
+const saveStmtsBtn = document.querySelector('.save_stmts');
+
+/* ---- Toast popups ---- */
+const toastContainer = document.getElementById('toast-container');
+
+function showToast(message, type = 'info', title) {
+  const defaults = { error: 'Error', success: 'Success', info: 'Notice' };
+  const toast = document.createElement('div');
+  toast.className = `toast ${type}`;
+  const iconChar = { error: '⚠', success: '✔', info: 'ℹ' }[type] || 'ℹ';
+  toast.innerHTML = `
+    <span class="icon">${iconChar}</span>
+    <div class="body">
+      <div class="title"></div>
+      <div class="text"></div>
+    </div>
+    <button class="close" aria-label="Dismiss">&times;</button>`;
+  toast.querySelector('.title').textContent = title || defaults[type] || 'Notice';
+  toast.querySelector('.text').textContent = message;
+
+  const dismiss = () => {
+    toast.classList.add('leaving');
+    toast.addEventListener('animationend', () => toast.remove(), { once: true });
+  };
+  toast.querySelector('.close').addEventListener('click', dismiss);
+  toastContainer.appendChild(toast);
+  if (type !== 'error') setTimeout(dismiss, 4000);
+  else setTimeout(dismiss, 8000);
+}
+
+/* ---- Guided step state ---- */
+function setStep(n, state) {
+  const step = document.querySelector(`.step[data-step="${n}"]`);
+  if (!step) return;
+  step.classList.remove('locked', 'done');
+  if (state === 'unlocked') return;
+  if (state) step.classList.add(state);
+}
 
 listingType.addEventListener('change', () => {
-  console.log(listingType.value)
+  if (listingType.value) {
+    setStep(1, 'done');
+    setStep(2, 'unlocked');
+  } else {
+    setStep(1, 'unlocked');
+    setStep(2, 'locked');
+  }
 })
 
 document.querySelector('.open_listing').addEventListener('click', async () => {
   if (!listingType.value) {
-    openListingStatus.classList.remove('green');
-    openListingStatus.classList.add('red');
-    openListingStatus.textContent = "Please choose architecture type!"
+    showToast('Please choose an architecture type first.', 'error', 'Architecture required');
     return
   }
   let start = Date.now();
   await openFile().then((file) => {
     start = Date.now();
-    openListingStatus.textContent = 'File is opened';
-    openListingStatus.classList.remove('red');
-    openListingStatus.classList.add('green');
     return file.text()
   }).then(text => {
     statements = listingType.value == "s390" ? getStatments390(text) : getStatments86(text);
     console.log(statements);
     openListingStatus.classList.remove('red');
     openListingStatus.classList.add('green');
-    openListingStatus.innerHTML = `Success! File is uploaded. </br>
-     ${statements.listingStatements.length} addresses and </br> ${statements.sourceStatements.length} statements were loaded`
+    openListingStatus.innerHTML = `Loaded ${statements.listingStatements.length} addresses and ${statements.sourceStatements.length} statements.`
     modNameInput.value = statements.moduleName;
+    setStep(2, 'done');
+    setStep(3, 'unlocked');
+    openTraceBtn.disabled = false;
+    showToast(`Listing loaded for module ${statements.moduleName}.`, 'success', 'Listing ready');
   }).catch((err) => {
-    openListingStatus.classList.remove('green');
-    openListingStatus.classList.add('red');
-    openListingStatus.textContent = 'Error!' + err.message
+    if (err.name === 'AbortError') return;
+    openListingStatus.textContent = '';
+    showToast(err.message, 'error', 'Could not read listing');
   }
   )
   const end = Date.now();
   console.log(`Execution time: ${end - start} ms`);
 });
 document.querySelector('.open_trace').addEventListener('click', () => {
+  if (!statements.sourceStatements) {
+    showToast('Please open a listing before loading a trace.', 'error', 'Listing required');
+    return
+  }
   openFile().then((file) => {
-    openTraceStatus.textContent = 'File is opened';
-    openTraceStatus.classList.remove('red');
-    openTraceStatus.classList.add('green');
     return file.text()
   }).then(text => {
     const start = Date.now();
@@ -223,42 +269,58 @@ document.querySelector('.open_trace').addEventListener('click', () => {
     console.log(mapping)
     const end = Date.now();
     console.log(`Execution time: ${end - start} ms`);
-    openTraceStatus.textContent = 'Mapping is created';
+    const matched = stmts.length;
     openTraceStatus.classList.remove('red');
-    openTraceStatus.classList.add('green');
+    openTraceStatus.classList.add(matched ? 'green' : 'red');
+    openTraceStatus.textContent = `Mapping created — ${matched} of ${commands.length} trace commands matched a source statement.`;
+    setStep(3, 'done');
+    setStep(4, 'unlocked');
+    saveBtn.disabled = false;
+    saveStmtsBtn.disabled = false;
+    if (matched) {
+      showToast(`Mapping created: ${matched} commands matched.`, 'success', 'Mapping ready');
+    } else {
+      showToast('The trace loaded, but no command addresses matched the listing. Check the module name and architecture.', 'error', 'No matches found');
+    }
   }).catch(
     (err) => {
-      openTraceStatus.classList.remove('green');
-      openTraceStatus.classList.add('red');
-      openTraceStatus.textContent = 'Error!' + err.message
-      throw err
+      if (err.name === 'AbortError') return;
+      openTraceStatus.textContent = '';
+      showToast(err.message, 'error', 'Could not build mapping');
     }
   )
 });
-const from = document.querySelector('.from');
-const to = document.querySelector('.to');
-const filename = document.querySelector('.name');
 document.querySelector('.save').addEventListener('click', () => {
   saveFile(mapping, 'full').then((file => {
+    if (!file) {
+      saveStatus.textContent = 'Save cancelled';
+      saveStatus.classList.remove('red', 'green');
+      return
+    }
     console.log(file)
-    saveStatus.textContent = 'Mapping is saved to ' + file.name;
+    saveStatus.textContent = 'Saved to ' + file.name;
     saveStatus.classList.remove('red');
     saveStatus.classList.add('green');
+    showToast('Mapping saved to ' + file.name, 'success', 'Saved');
   })).catch(err => {
-    saveStatus.textContent = err.message;
-    saveStatus.classList.remove('green');
-    saveStatus.classList.add('red');
+    saveStatus.textContent = '';
+    showToast(err.message, 'error', 'Could not save mapping');
   })
 });
 document.querySelector('.save_stmts').addEventListener('click', () => {
   saveFile(stmts.join(''), 'cmds').then(file => {
+    if (!file) {
+      saveSrcStatus.textContent = 'Save cancelled';
+      saveSrcStatus.classList.remove('red', 'green');
+      return
+    }
     console.log(file)
-    saveSrcStatus.textContent = 'Source trace is saved to ' + file.name;
+    saveSrcStatus.textContent = 'Saved to ' + file.name;
     saveSrcStatus.classList.remove('red');
     saveSrcStatus.classList.add('green');
+    showToast('Source trace saved to ' + file.name, 'success', 'Saved');
   }).catch(err => {
-    saveSrcStatus.textContent = err.message;
-    saveSrcStatus.classList.remove('green');
-    saveSrcStatus.classList.add('red');
+    saveSrcStatus.textContent = '';
+    showToast(err.message, 'error', 'Could not save source trace');
   })
 });
