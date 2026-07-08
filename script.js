@@ -1,29 +1,62 @@
-let path = undefined
-const openFile = async () => {
-  // console.log(WellKnownDirectory)
+// Handle of the last file touched; used as `startIn` so the pickers reopen
+// in the same folder the user last worked in.
+let lastHandle = undefined;
 
+// The File System Access API (showOpenFilePicker/showSaveFilePicker) only
+// exists in Chromium browsers. Detect once so we can fall back gracefully.
+const supportsFSA = 'showOpenFilePicker' in window && 'showSaveFilePicker' in window;
+
+// Read a picked File as text. Uses UTF-8 (File.text()) deliberately: the
+// listing parsers depend on the column-1 control byte being turned into the
+// '�' replacement character (see the sentinel check in parseSourceLine),
+// which only happens under UTF-8 decoding. Do not swap the decoder without
+// making that strip encoding-independent and verifying against real samples.
+const readFileText = async (file) => file.text();
+
+// Fallback open for non-Chromium browsers: classic <input type="file">.
+const openFileFallback = () => new Promise((resolve, reject) => {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.addEventListener('change', () => {
+    if (input.files[0]) resolve(input.files[0]);
+    else reject(Object.assign(new Error('No file selected'), { name: 'AbortError' }));
+  });
+  // If the dialog is dismissed no 'change' fires; nothing to resolve, which
+  // is fine — the user simply gets no further action.
+  input.click();
+});
+
+const openFile = async () => {
+  if (!supportsFSA) return openFileFallback();
   const [handle] = await window.showOpenFilePicker({
-    startIn: path
-  })
-  path = handle;
-  const file = await handle.getFile()
-  return file
+    startIn: lastHandle,
+    types: [{
+      description: 'Listing / Trace',
+      accept: { 'text/plain': ['.txt', '.lst', '.list', '.trc', '.trace'] },
+    }],
+  });
+  lastHandle = handle;
+  return handle.getFile();
 };
-// const openFile = async () => {
-//   return new Promise((resolve) => {
-//     const input = document.createElement('input');
-//     input.type = 'file';
-//     input.addEventListener('change', () => {
-//       resolve(input.files[0]);
-//     });
-//     input.click();
-//   });
-// };
+
+// Fallback save for non-Chromium browsers: trigger an anchor download.
+const saveFileFallback = (blob, type) => {
+  const name = `mapping.${type}.txt`;
+  const url = URL.createObjectURL(new Blob([blob], { type: 'text/plain' }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name;
+  a.click();
+  URL.revokeObjectURL(url);
+  // We cannot know the final path the browser chose, so report the name.
+  return { name };
+};
 
 const saveFile = async (blob, type) => {
+  if (!supportsFSA) return saveFileFallback(blob, type);
   try {
     const handle = await window.showSaveFilePicker({
-      startIn: path,
+      startIn: lastHandle,
       types: [{
         description: 'Mapping',
         accept: {
@@ -214,7 +247,7 @@ document.querySelector('.open_listing').addEventListener('click', async () => {
   let start = Date.now();
   await openFile().then((file) => {
     start = Date.now();
-    return file.text()
+    return readFileText(file)
   }).then(text => {
     statements = listingType.value == "s390" ? getStatments390(text) : getStatments86(text);
     console.log(statements);
@@ -241,7 +274,7 @@ document.querySelector('.open_trace').addEventListener('click', () => {
     return
   }
   openFile().then((file) => {
-    return file.text()
+    return readFileText(file)
   }).then(text => {
     const start = Date.now();
     const modName = modNameInput.value
@@ -290,37 +323,38 @@ document.querySelector('.open_trace').addEventListener('click', () => {
     }
   )
 });
-document.querySelector('.save').addEventListener('click', () => {
-  saveFile(mapping, 'full').then((file => {
+// Shared save flow for both save buttons.
+//   blob     - text content to write
+//   type     - filename discriminator ('full' | 'cmds')
+//   statusEl - the status line to update
+//   label    - human-readable name for toasts ('Mapping' | 'Source trace')
+function handleSave(blob, type, statusEl, label) {
+  if (!blob || !blob.length) {
+    statusEl.textContent = 'Nothing to save';
+    statusEl.classList.remove('red', 'green');
+    showToast(`${label} is empty — load a listing and trace first.`, 'error', 'Nothing to save');
+    return;
+  }
+  saveFile(blob, type).then((file) => {
     if (!file) {
-      saveStatus.textContent = 'Save cancelled';
-      saveStatus.classList.remove('red', 'green');
-      return
+      statusEl.textContent = 'Save cancelled';
+      statusEl.classList.remove('red', 'green');
+      return;
     }
-    console.log(file)
-    saveStatus.textContent = 'Saved to ' + file.name;
-    saveStatus.classList.remove('red');
-    saveStatus.classList.add('green');
-    showToast('Mapping saved to ' + file.name, 'success', 'Saved');
-  })).catch(err => {
-    saveStatus.textContent = '';
-    showToast(err.message, 'error', 'Could not save mapping');
-  })
+    console.log(file);
+    statusEl.textContent = 'Saved to ' + file.name;
+    statusEl.classList.remove('red');
+    statusEl.classList.add('green');
+    showToast(`${label} saved to ${file.name}`, 'success', 'Saved');
+  }).catch((err) => {
+    statusEl.textContent = '';
+    showToast(err.message, 'error', `Could not save ${label.toLowerCase()}`);
+  });
+}
+
+document.querySelector('.save').addEventListener('click', () => {
+  handleSave(mapping, 'full', saveStatus, 'Mapping');
 });
 document.querySelector('.save_stmts').addEventListener('click', () => {
-  saveFile(stmts.join(''), 'cmds').then(file => {
-    if (!file) {
-      saveSrcStatus.textContent = 'Save cancelled';
-      saveSrcStatus.classList.remove('red', 'green');
-      return
-    }
-    console.log(file)
-    saveSrcStatus.textContent = 'Saved to ' + file.name;
-    saveSrcStatus.classList.remove('red');
-    saveSrcStatus.classList.add('green');
-    showToast('Source trace saved to ' + file.name, 'success', 'Saved');
-  }).catch(err => {
-    saveSrcStatus.textContent = '';
-    showToast(err.message, 'error', 'Could not save source trace');
-  })
+  handleSave(stmts.join(''), 'cmds', saveSrcStatus, 'Source trace');
 });
