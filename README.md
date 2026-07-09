@@ -1,3 +1,5 @@
+[![tests](https://github.com/StarastsenkaVitali/spl-mapper/actions/workflows/tests.yml/badge.svg?branch=main&event=push)](https://github.com/StarastsenkaVitali/spl-mapper/actions/workflows/tests.yml)
+
 # SPL Mapper
 
 A browser-based tool that correlates a mainframe **assembler listing** with a runtime **trace**, producing a line-by-line mapping between machine addresses, the assembler statements at those addresses, and the original source-code statements.
