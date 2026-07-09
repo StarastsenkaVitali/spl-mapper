@@ -1,15 +1,26 @@
 name: tests
 
-# Runs when commits land on main — i.e. on a direct push to main or when any
-# branch/PR is merged into main (a merge produces a push to main).
 on:
   pull_request:
+    branches: [main]
   push:
     branches: [main]
+
+# Only read access is needed to check out and test the code.
+permissions:
+  contents: read
+
+# Cancel an in-progress run when the same ref gets a newer push.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      ZIP_PASS: ${{ secrets.ZIP_PASS }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -17,11 +28,8 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '24'
+          node-version: "24"
 
       - name: Run sample tests
-        # The password-protected tests/samples.zip is decrypted by
-        # tests/run.sh (via extract-samples.sh) using $ZIP_PASS.
-        env:
-          ZIP_PASS: ${{ secrets.ZIP_PASS }}
+        if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
         run: bash tests/run.sh

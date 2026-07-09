@@ -1,5 +1,7 @@
 # Tests
 
+[![tests](https://github.com/StarastsenkaVitali/spl-mapper/actions/workflows/tests.yml/badge.svg)](https://github.com/StarastsenkaVitali/spl-mapper/actions/workflows/tests.yml)
+
 `run-tests.js` is an end-to-end parse test for SPL Mapper. It loads the real
 parsing logic from `../script.js` (inside a Node `vm` sandbox with stubbed
 browser globals, so no code duplication), runs it against a listing + trace
@@ -98,12 +100,7 @@ node tests/run-tests.js --arch s390 samples/1.lst samples/2.trace samples/3.full
 ## Continuous integration
 
 `.github/workflows/tests.yml` runs `tests/run.sh` on every push to `main`
-(including branch/PR merges into `main`). The archive password is supplied to
-the job as the `ZIP_PASS` environment variable, sourced from a repository
-secret of the same name.
-
-Set it once under **Settings → Secrets and variables → Actions → New repository
-secret**, name `ZIP_PASS`, value = the `samples.zip` password.
+(including branch/PR merges) and on pull requests targeting `main`.
 
 ## Note on the mapping join
 
