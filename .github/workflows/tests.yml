@@ -1,0 +1,26 @@
+name: tests
+
+# Runs when commits land on main — i.e. on a direct push to main or when any
+# branch/PR is merged into main (a merge produces a push to main).
+on:
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run sample tests
+        # The password-protected tests/samples.zip is decrypted by
+        # tests/run.sh (via extract-samples.sh) using $ZIP_PASS.
+        env:
+          ZIP_PASS: ${{ secrets.ZIP_PASS }}
+        run: bash tests/run.sh
