@@ -3,6 +3,7 @@ name: tests
 # Runs when commits land on main — i.e. on a direct push to main or when any
 # branch/PR is merged into main (a merge produces a push to main).
 on:
+  pull_request:
   push:
     branches: [main]
 
